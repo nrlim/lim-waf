@@ -53,7 +53,7 @@ var serveCmd = &cobra.Command{
 		}
 
 		// Initialize Reverse Proxy
-		proxy, err := engine.NewReverseProxy(wafEngine, cfg.Sites[0].Domain)
+		proxy, err := engine.NewReverseProxy(wafEngine)
 		if err != nil {
 			log.Fatalf("Failed to initialize Reverse Proxy: %v", err)
 		}

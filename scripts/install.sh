@@ -39,7 +39,7 @@ fi
 echo "[3/5] Setting up OWASP Core Rule Set (CRS) v4..."
 if [ ! -d "$RULES_DIR/coreruleset" ]; then
     apt-get update -qq && apt-get install -qq -y git
-    git clone -b v4.0/master https://github.com/coreruleset/coreruleset.git "$RULES_DIR/coreruleset"
+    git clone https://github.com/coreruleset/coreruleset.git "$RULES_DIR/coreruleset"
     cp "$RULES_DIR/coreruleset/crs-setup.conf.example" "$RULES_DIR/coreruleset/crs-setup.conf"
     echo "  OWASP CRS v4 downloaded."
 else

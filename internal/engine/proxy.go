@@ -3,9 +3,11 @@ package engine
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -49,50 +51,72 @@ func (i *interceptorRW) Write(b []byte) (int, error) {
 	return i.ResponseWriter.Write(b)
 }
 
-// NewReverseProxy creates a new reverse proxy with the WAF engine attached.
-func NewReverseProxy(eng *WAFEngine, siteDomain string) (*ReverseProxy, error) {
+// NewReverseProxy creates a new reverse proxy that routes based on the domain.
+func NewReverseProxy(eng *WAFEngine) (*ReverseProxy, error) {
 	if len(eng.Config.Sites) == 0 {
 		return nil, fmt.Errorf("no sites configured")
 	}
-	
-	siteCfg := eng.Config.Sites[0]
 
-	targetURL, err := url.Parse(siteCfg.Backend)
-	if err != nil {
-		return nil, fmt.Errorf("invalid backend URL '%s': %w", siteCfg.Backend, err)
+	proxies := make(map[string]http.Handler)
+
+	for _, siteCfg := range eng.Config.Sites {
+		targetURL, err := url.Parse(siteCfg.Backend)
+		if err != nil {
+			return nil, fmt.Errorf("invalid backend URL '%s': %w", siteCfg.Backend, err)
+		}
+
+		proxy := httputil.NewSingleHostReverseProxy(targetURL)
+
+		proxy.Transport = &http.Transport{
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+
+		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+			log.Printf("Proxy error for %s: %v", siteCfg.Domain, err)
+			http.Error(w, "Bad Gateway", http.StatusBadGateway)
+		}
+
+		var finalHandler http.Handler = proxy
+
+		if siteCfg.WAF.Enabled {
+			wafHandler := txhttp.WrapHandler(eng.WAF, proxy)
+			finalHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				iw := &interceptorRW{
+					ResponseWriter: w,
+					req:            r,
+					eng:            eng,
+				}
+				wafHandler.ServeHTTP(iw, r)
+			})
+		}
+
+		domain := strings.ToLower(siteCfg.Domain)
+		proxies[domain] = finalHandler
+		if !strings.HasPrefix(domain, "www.") {
+			proxies["www."+domain] = finalHandler
+		}
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+	masterHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := strings.ToLower(r.Host)
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
 
-	proxy.Transport = &http.Transport{
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		log.Printf("Proxy error: %v", err)
-		http.Error(w, "Bad Gateway", http.StatusBadGateway)
-	}
-
-	var finalHandler http.Handler = proxy
-
-	if siteCfg.WAF.Enabled {
-		wafHandler := txhttp.WrapHandler(eng.WAF, proxy)
-		// We wrap the coraza handler with our interceptor to catch 403s
-		finalHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			iw := &interceptorRW{
-				ResponseWriter: w,
-				req:            r,
-				eng:            eng,
-			}
-			wafHandler.ServeHTTP(iw, r)
-		})
-	}
+		if handler, ok := proxies[host]; ok {
+			handler.ServeHTTP(w, r)
+		} else {
+			// Fallback to the first site if host doesn't match
+			firstSiteDomain := strings.ToLower(eng.Config.Sites[0].Domain)
+			proxies[firstSiteDomain].ServeHTTP(w, r)
+		}
+	})
 
 	return &ReverseProxy{
-		Handler: finalHandler,
+		Handler: masterHandler,
 		Engine:  eng,
 	}, nil
 }
