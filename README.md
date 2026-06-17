@@ -18,45 +18,96 @@ Instead of installing a raw WAF engine, LIM WAF is packaged as a ready-to-deploy
 3. If **malicious**, it displays a custom block page.
 4. If **safe**, it proxies the request to your backend.
 
-## Installation
+## Installation & VPS Deployment
 
-A convenient install script is provided for Ubuntu/Debian based systems.
+Since LIM WAF compiles to a single static binary, you don't need to install Go or any development tools on your production VPS. The cleanest way to install is to place the installer files in `/opt`.
 
-1. Clone or download this repository.
-2. Build the binary using `make build`.
-3. Run the installer:
-   ```bash
-   sudo ./scripts/install.sh
-   ```
+### 1. Build Locally (Linux Target)
+On your local machine (Windows/Mac/Linux), compile the binary specifically for Linux architecture:
 
-The script will:
-- Copy the binary to `/usr/local/bin`
-- Download the latest OWASP Core Rule Set (CRS)
-- Create default configurations in `/etc/lim-waf`
-- Set up a systemd service (`lim-waf.service`)
+```powershell
+# If using Windows PowerShell:
+$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o lim-waf-linux ./cmd/lim-waf
 
-## Configuration
+# If using Mac/Linux Bash:
+GOOS=linux GOARCH=amd64 go build -o lim-waf-linux ./cmd/lim-waf
+```
 
-Configuration is located at `/etc/lim-waf/config.yaml`.
+### 2. Upload to VPS (`/opt` Directory)
+Create a clean directory in your VPS for the installer, then upload the files:
+
+```bash
+# On your VPS, prepare the installer folder:
+sudo mkdir -p /opt/lim-waf-installer/build
+sudo chown -R $USER:$USER /opt/lim-waf-installer
+
+# On your local machine, upload the files directly to that folder:
+scp lim-waf-linux root@YOUR_VPS_IP:/opt/lim-waf-installer/build/lim-waf
+scp -r scripts root@YOUR_VPS_IP:/opt/lim-waf-installer/
+```
+
+### 3. Run the Installer
+SSH into your VPS and execute the setup script:
+
+```bash
+cd /opt/lim-waf-installer
+sudo chmod +x scripts/install.sh
+sudo ./scripts/install.sh
+```
+
+The script will securely distribute the files:
+- Binary installed to: `/usr/local/bin/lim-waf`
+- OWASP CRS v4 rules and configs to: `/etc/lim-waf/`
+- Service configured at: `/etc/systemd/system/lim-waf.service`
+
+## Best Practice Configuration (Multi-Domain with Nginx)
+
+The recommended topology is placing LIM WAF between your Nginx SSL termination and your backend applications:
+`Internet ➜ Nginx (Port 443) ➜ LIM WAF (Port 8081) ➜ Backend Apps`
+
+Edit your `/etc/lim-waf/config.yaml` to handle multiple domains:
 
 ```yaml
 server:
-  listen: ":80"
+  listen: ":8081" # Internal WAF Port
 
 sites:
-  - domain: "example.com"
-    backend: "http://127.0.0.1:8080" # Your actual application backend
+  # App 1
+  - domain: "example1.com"
+    backend: "http://127.0.0.1:3000"
     waf:
       enabled: true
-      mode: "on" # "on", "detection_only", or "off"
+      mode: "on"
+
+  # App 2
+  - domain: "example2.com"
+    backend: "http://127.0.0.1:3001"
+    waf:
+      enabled: true
+      mode: "on"
 
 rules:
   crs_path: "/etc/lim-waf/rules/coreruleset"
   custom_rules_path: "/etc/lim-waf/rules/custom"
 
+logging:
+  level: "info"
+  file: "/var/log/lim-waf/access.log"
+  audit_log: "/var/log/lim-waf/audit.log"
+
 branding:
   name: "LIM"
   url: "https://nuralim.dev"
+```
+
+After configuring, restart the service:
+```bash
+sudo systemctl restart lim-waf
+```
+
+**Nginx Setup:** In your Nginx config (`/etc/nginx/sites-enabled/...`), change your backend `proxy_pass` to point to LIM WAF:
+```nginx
+proxy_pass http://127.0.0.1:8081; # Pass traffic to WAF
 ```
 
 ## Running
