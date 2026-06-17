@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Report - Access Denied</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+        :root {
+            --bg-base: #07090e;
+            --surface-color: rgba(17, 20, 26, 0.85);
+            --surface-border: #232830;
+            --text-primary: #e6edf3;
+            --text-secondary: #7d8590;
+            --accent-color: #3182ce;
+            --danger-color: #e53e3e;
+            --mono-font: 'IBM Plex Mono', Consolas, Menlo, monospace;
+            --sans-font: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: var(--sans-font);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Dynamic Neural Network Canvas */
+        #neural-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Vignette overlay for depth */
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 30%, var(--bg-base) 100%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .incident-card {
+            width: 100%;
+            max-width: 640px;
+            background-color: var(--surface-color);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--surface-border);
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            padding: 2rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        .incident-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--surface-border);
+        }
+
+        .icon-container {
+            flex-shrink: 0;
+            width: 48px;
+            height: 48px;
+            background-color: rgba(229, 62, 62, 0.1);
+            border: 1px solid rgba(229, 62, 62, 0.2);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--danger-color);
+            position: relative;
+        }
+
+        /* Subtle scanning line on icon */
+        .icon-container::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: var(--danger-color);
+            opacity: 0.5;
+            animation: scanline 3s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { top: 0; opacity: 0; }
+            10% { opacity: 0.5; }
+            90% { opacity: 0.5; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        .icon-container svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .header-text h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0 0 0.5rem;
+            letter-spacing: -0.01em;
+        }
+
+        .header-text p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        /* Technical Data Readout */
+        .telemetry-box {
+            background-color: rgba(13, 17, 23, 0.8);
+            border: 1px solid var(--surface-border);
+            border-radius: 6px;
+            font-family: var(--mono-font);
+            font-size: 0.85rem;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .telemetry-header {
+            background-color: rgba(22, 27, 34, 0.8);
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid var(--surface-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background-color: var(--danger-color);
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            box-shadow: 0 0 8px var(--danger-color);
+            animation: pulse-dot 2s infinite alternate;
+        }
+
+        @keyframes pulse-dot {
+            0% { opacity: 0.5; box-shadow: 0 0 4px var(--danger-color); }
+            100% { opacity: 1; box-shadow: 0 0 12px var(--danger-color); }
+        }
+
+        .telemetry-body {
+            padding: 1rem;
+            color: var(--text-primary);
+        }
+
+        .data-row {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 0.75rem;
+        }
+
+        .data-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .data-key {
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .data-value {
+            color: #a5d6ff;
+            word-break: break-all;
+        }
+
+        .data-value.error {
+            color: #ff7b72;
+        }
+
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .branding {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .branding-link {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .branding-link:hover {
+            color: var(--accent-color);
+        }
+
+        @media (min-width: 640px) {
+            .data-row {
+                flex-direction: row;
+                margin-bottom: 0.5rem;
+            }
+            .data-key {
+                width: 140px;
+                flex-shrink: 0;
+                margin-bottom: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Dynamic background elements -->
+    <canvas id="neural-canvas"></canvas>
+    <div class="vignette"></div>
+    
+    <div class="incident-card">
+        <div class="incident-header">
+            <div class="icon-container">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+            <div class="header-text">
+                <h1>Connection Intercepted</h1>
+                <p>The neural firewall engine has isolated this request due to matched security heuristics. Access to the requested resource is denied.</p>
+            </div>
+        </div>
+
+        <div class="telemetry-box">
+            <div class="telemetry-header">
+                <div><span class="status-dot"></span> Request Telemetry</div>
+                <div>Status: 403 Forbidden</div>
+            </div>
+            <div class="telemetry-body">
+                <div class="data-row">
+                    <span class="data-key">Event_ID:</span>
+                    <span class="data-value">{{ .TransactionID }}</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-key">Source_IP:</span>
+                    <span class="data-value">{{ .ClientIP }}</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-key">Timestamp:</span>
+                    <span class="data-value">{{ .Timestamp }}</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-key">Resolution:</span>
+                    <span class="data-value error">BLOCKED (Rule Violation)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <span>If you believe this is a false positive, please provide the Event_ID.</span>
+            <div class="branding">
+                Secured by <a href="{{ .BrandingURL }}" class="branding-link" target="_blank" rel="noopener noreferrer">{{ .BrandingName }}</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script for Dynamic Neural Background -->
+    <script>
+        const canvas = document.getElementById('neural-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+        
+        // Colors for the subtle neural effect
+        const connectionColor = 'rgba(49, 130, 206, '; // Blue tint
+        const particleColor = 'rgba(125, 133, 144, 0.4)'; // Subtle gray
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            initParticles();
+        }
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 0.5; // Very slow movement
+                this.vy = (Math.random() - 0.5) * 0.5;
+                this.radius = Math.random() * 1.5 + 0.5;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Wrap around edges
+                if (this.x < 0) this.x = width;
+                if (this.x > width) this.x = 0;
+                if (this.y < 0) this.y = height;
+                if (this.y > height) this.y = 0;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = particleColor;
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            // Calculate number of particles based on screen size to maintain density
+            const numParticles = Math.min(Math.floor((width * height) / 15000), 150);
+            for (let i = 0; i < numParticles; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Update and draw particles
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+
+                // Draw connections
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    // Connect if close enough
+                    if (dist < 120) {
+                        // Opacity based on distance
+                        const opacity = (1 - dist / 120) * 0.15; // Max opacity 0.15 for subtlety
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = connectionColor + opacity + ')';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+        animate();
+    </script>
+</body>
+</html>

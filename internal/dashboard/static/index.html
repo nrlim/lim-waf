@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIM WAF Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #e2e8f0;
+            --accent-color: #3b82f6;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .navbar {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .shield {
+            color: var(--accent-color);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .card h3 {
+            margin: 0 0 1rem;
+            font-size: 1rem;
+            color: #94a3b8;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+
+        .text-success { color: var(--success-color); }
+        .text-danger { color: var(--danger-color); }
+        .text-accent { color: var(--accent-color); }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #2563eb;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            color: #94a3b8;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="brand">
+            <svg class="shield" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            LIM WAF Dashboard
+        </div>
+        <button class="btn" onclick="reloadRules()">Reload Rules</button>
+    </nav>
+
+    <div class="container">
+        <div class="grid">
+            <div class="card">
+                <h3>Total Requests</h3>
+                <div class="stat-value text-accent" id="totalReqs">0</div>
+            </div>
+            <div class="card">
+                <h3>Blocked Requests</h3>
+                <div class="stat-value text-danger" id="blockedReqs">0</div>
+            </div>
+            <div class="card">
+                <h3>WAF Engine Status</h3>
+                <div class="stat-value text-success">Online</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Recent Blocks</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>IP Address</th>
+                        <th>Rule ID</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody id="logsTable">
+                    <tr><td colspan="4">No data available yet</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                document.getElementById('totalReqs').innerText = data.total_requests || 0;
+                document.getElementById('blockedReqs').innerText = data.blocked_requests || 0;
+            } catch (e) {
+                console.error("Failed to fetch stats", e);
+            }
+        }
+
+        async function reloadRules() {
+            try {
+                const res = await fetch('/api/rules/reload', { method: 'POST' });
+                if (res.ok) {
+                    alert('Rules reloaded successfully!');
+                } else {
+                    alert('Failed to reload rules.');
+                }
+            } catch (e) {
+                alert('Error connecting to API.');
+            }
+        }
+
+        // Fetch initially and then every 5 seconds
+        fetchStats();
+        setInterval(fetchStats, 5000);
+    </script>
+</body>
+</html>

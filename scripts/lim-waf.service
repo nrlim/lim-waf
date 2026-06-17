@@ -1,0 +1,17 @@
+[Unit]
+Description=LIM WAF - Custom Branded Coraza Web Application Firewall
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/bin/lim-waf serve --config /etc/lim-waf/config.yaml
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/lim-waf/service.log
+StandardError=append:/var/log/lim-waf/error.log
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
