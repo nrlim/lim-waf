@@ -60,6 +60,31 @@ The script will securely distribute the files:
 - OWASP CRS v4 rules and configs to: `/etc/lim-waf/`
 - Service configured at: `/etc/systemd/system/lim-waf.service`
 
+## Updating LIM WAF to a New Version
+
+If you already have LIM WAF installed and want to update to the latest version (to get new features like the Admin Dashboard, Security Hardening, or UI updates), follow these steps:
+
+**1. Build the New Binary Locally:**
+From your local machine inside the project directory, compile the new version for Linux:
+```bash
+GOOS=linux GOARCH=amd64 go build -o lim-waf-linux ./cmd/lim-waf
+```
+
+**2. Upload and Replace the Binary on Your VPS:**
+Upload the newly built binary directly to the installation path on your server:
+```bash
+scp lim-waf-linux root@YOUR_VPS_IP:/usr/local/bin/lim-waf
+```
+
+**3. Restart the Service:**
+SSH into your VPS and restart the LIM WAF service to apply the update:
+```bash
+ssh root@YOUR_VPS_IP
+systemctl restart lim-waf
+systemctl status lim-waf
+```
+*(Your existing configurations in `/etc/lim-waf/config.yaml` will be preserved safely).*
+
 ## Best Practice Configuration (Multi-Domain with Nginx)
 
 The recommended topology is placing LIM WAF between your Nginx SSL termination and your backend applications:
