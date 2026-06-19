@@ -2,7 +2,7 @@
 set -e
 
 echo "============================================="
-echo "   Installing LIM WAF (Coraza Powered)       "
+echo "   Installing LIM WAF                        "
 echo "============================================="
 
 if [ "$EUID" -ne 0 ]; then

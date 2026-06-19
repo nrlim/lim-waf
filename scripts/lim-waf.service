@@ -1,5 +1,5 @@
 [Unit]
-Description=LIM WAF - Custom Branded Coraza Web Application Firewall
+Description=LIM WAF - Custom Branded Web Application Firewall
 After=network.target
 
 [Service]

@@ -82,6 +82,7 @@ func NewReverseProxy(eng *WAFEngine) (*ReverseProxy, error) {
 		var finalHandler http.Handler = proxy
 
 		if siteCfg.WAF.Enabled {
+			// Base WAF handler
 			wafHandler := txhttp.WrapHandler(eng.WAF, proxy)
 			finalHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				iw := &interceptorRW{
@@ -92,6 +93,15 @@ func NewReverseProxy(eng *WAFEngine) (*ReverseProxy, error) {
 				wafHandler.ServeHTTP(iw, r)
 			})
 		}
+
+		// Apply middlewares (Outermost to innermost)
+		// Chain: ThreatLogger -> RateLimiter -> IPReputation -> BotDetection -> RequestValidator -> SecurityHeaders -> WAF -> Proxy
+		finalHandler = eng.SecurityHeaders.Middleware(finalHandler)
+		finalHandler = eng.RequestValidator.Middleware(finalHandler)
+		finalHandler = eng.BotDetection.Middleware(finalHandler)
+		finalHandler = eng.IPReputation.Middleware(finalHandler)
+		finalHandler = eng.RateLimiter.Middleware(finalHandler)
+		finalHandler = eng.ThreatLogger.Middleware(finalHandler)
 
 		domain := strings.ToLower(siteCfg.Domain)
 		proxies[domain] = finalHandler

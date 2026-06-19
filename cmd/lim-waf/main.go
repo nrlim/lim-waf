@@ -31,7 +31,7 @@ const banner = `
 
 var rootCmd = &cobra.Command{
 	Use:   "lim-waf",
-	Short: "LIM WAF is a custom Coraza-based Web Application Firewall",
+	Short: "LIM WAF is a high-performance custom Web Application Firewall",
 }
 
 var serveCmd = &cobra.Command{
@@ -59,7 +59,7 @@ var serveCmd = &cobra.Command{
 		}
 
 		// Start Dashboard Server
-		dashServer := dashboard.NewServer(wafEngine, 9443)
+		dashServer := dashboard.NewServer(wafEngine, cfgFile)
 		go func() {
 			if err := dashServer.Start(); err != nil {
 				log.Printf("Dashboard server error: %v", err)

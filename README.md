@@ -1,11 +1,11 @@
 # LIM WAF
 
-**LIM WAF** is a custom, branded Web Application Firewall (WAF) powered by the high-performance [Coraza Engine](https://coraza.io) and fully compatible with OWASP Core Rule Set (CRS) v4.
+**LIM WAF** is a custom, branded Web Application Firewall (WAF) powered by a high-performance Go-based engine and fully compatible with OWASP Core Rule Set (CRS) v4.
 
 Instead of installing a raw WAF engine, LIM WAF is packaged as a ready-to-deploy reverse proxy specifically designed for VPS installations. It features custom-branded error pages indicating "**Secured by LIM**" and includes an embedded admin dashboard.
 
 ## Features
-- **Powered by Coraza**: Robust security powered by Go and OWASP ModSecurity compatibility.
+- **High-Performance Engine**: Robust security powered by Go and OWASP ModSecurity compatibility.
 - **OWASP CRS v4 Ready**: Protects against SQLi, XSS, RCE, and more out-of-the-box.
 - **Custom Branding**: Fully branded "403 Access Denied" block pages linked to `https://nuralim.dev`.
 - **Admin Dashboard**: Real-time stats and rule hot-reloading via an embedded web interface (port 9443).
@@ -14,7 +14,7 @@ Instead of installing a raw WAF engine, LIM WAF is packaged as a ready-to-deploy
 ## Architecture
 
 1. **Client** sends request -> **Upstream Proxy (Optional)** -> **LIM WAF (:80)**.
-2. **LIM WAF** inspects the request using Coraza rules.
+2. **LIM WAF** inspects the request using the Core Rule Set.
 3. If **malicious**, it displays a custom block page.
 4. If **safe**, it proxies the request to your backend.
 
