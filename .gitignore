@@ -38,3 +38,4 @@ scripts/load-test.sh
 scripts/load-test.ps1
 proxies.txt
 waf_testing_guide.md
+testenv/config.yaml
