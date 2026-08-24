@@ -41,6 +41,12 @@ func (rw *responseWriterWrapper) Write(b []byte) (int, error) {
 	return rw.ResponseWriter.Write(b)
 }
 
+func (rw *responseWriterWrapper) Flush() {
+	if flusher, ok := rw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 // ThreatLogger logs all requests in a structured format.
 type ThreatLogger struct {
 	config *config.ThreatLoggingConfig

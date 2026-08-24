@@ -35,34 +35,76 @@ func (sh *SecurityHeaders) Middleware(next http.Handler) http.Handler {
 			}
 		}
 
-		// Set Security Headers
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-XSS-Protection", "1; mode=block")
-		w.Header().Set("X-Permitted-Cross-Domain-Policies", "none")
-
-		if sh.config.FrameOptions != "" {
-			w.Header().Set("X-Frame-Options", sh.config.FrameOptions)
-		}
-
-		if sh.config.CSP != "" {
-			w.Header().Set("Content-Security-Policy", sh.config.CSP)
-		}
-
-		if sh.config.ReferrerPolicy != "" {
-			w.Header().Set("Referrer-Policy", sh.config.ReferrerPolicy)
-		}
-
-		if sh.config.HSTS {
-			w.Header().Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains", sh.config.HSTSMaxAge))
-		}
-
-		// Also apply CORS to normal responses
-		if sh.config.CORS.Enabled {
-			sh.handleCORS(w, r)
-		}
-
-		next.ServeHTTP(w, r)
+		// Use a wrapper that defers header writing until the upstream response is received,
+		// so we can check what the backend already set and avoid overwriting.
+		sw := &secHeaderWriter{ResponseWriter: w, sh: sh, r: r, headerWritten: false}
+		next.ServeHTTP(sw, r)
 	})
+}
+
+// secHeaderWriter intercepts WriteHeader to inject security headers only if
+// the upstream backend (Next.js) hasn't already set them.
+type secHeaderWriter struct {
+	http.ResponseWriter
+	sh            *SecurityHeaders
+	r             *http.Request
+	headerWritten bool
+}
+
+func (sw *secHeaderWriter) WriteHeader(statusCode int) {
+	if !sw.headerWritten {
+		sw.headerWritten = true
+		sw.applyHeaders()
+	}
+	sw.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (sw *secHeaderWriter) Write(b []byte) (int, error) {
+	if !sw.headerWritten {
+		sw.headerWritten = true
+		sw.applyHeaders()
+	}
+	return sw.ResponseWriter.Write(b)
+}
+
+func (sw *secHeaderWriter) Flush() {
+	if flusher, ok := sw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// setIfAbsent sets a response header only if the upstream backend didn't already provide it.
+func (sw *secHeaderWriter) setIfAbsent(key, value string) {
+	if sw.Header().Get(key) == "" {
+		sw.Header().Set(key, value)
+	}
+}
+
+func (sw *secHeaderWriter) applyHeaders() {
+	sw.setIfAbsent("X-Content-Type-Options", "nosniff")
+	sw.setIfAbsent("X-XSS-Protection", "1; mode=block")
+	sw.setIfAbsent("X-Permitted-Cross-Domain-Policies", "none")
+
+	if sw.sh.config.FrameOptions != "" {
+		sw.setIfAbsent("X-Frame-Options", sw.sh.config.FrameOptions)
+	}
+
+	if sw.sh.config.CSP != "" {
+		sw.setIfAbsent("Content-Security-Policy", sw.sh.config.CSP)
+	}
+
+	if sw.sh.config.ReferrerPolicy != "" {
+		sw.setIfAbsent("Referrer-Policy", sw.sh.config.ReferrerPolicy)
+	}
+
+	if sw.sh.config.HSTS {
+		sw.setIfAbsent("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains", sw.sh.config.HSTSMaxAge))
+	}
+
+	// Also apply CORS to normal responses
+	if sw.sh.config.CORS.Enabled {
+		sw.sh.handleCORS(sw.ResponseWriter, sw.r)
+	}
 }
 
 // handleCORS sets CORS headers and returns true if it's a valid preflight request.

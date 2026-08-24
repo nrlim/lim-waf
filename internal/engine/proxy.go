@@ -51,6 +51,12 @@ func (i *interceptorRW) Write(b []byte) (int, error) {
 	return i.ResponseWriter.Write(b)
 }
 
+func (i *interceptorRW) Flush() {
+	if flusher, ok := i.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 // NewReverseProxy creates a new reverse proxy that routes based on the domain.
 func NewReverseProxy(eng *WAFEngine) (*ReverseProxy, error) {
 	if len(eng.Config.Sites) == 0 {
@@ -60,6 +66,7 @@ func NewReverseProxy(eng *WAFEngine) (*ReverseProxy, error) {
 	proxies := make(map[string]http.Handler)
 
 	for _, siteCfg := range eng.Config.Sites {
+		siteCfg := siteCfg // Explicit rebind for closure capture safety
 		targetURL, err := url.Parse(siteCfg.Backend)
 		if err != nil {
 			return nil, fmt.Errorf("invalid backend URL '%s': %w", siteCfg.Backend, err)
