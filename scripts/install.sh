@@ -29,7 +29,11 @@ echo "[2/5] Downloading LIM WAF binary..."
 # Example: curl -sL "https://github.com/nrlim/lim-waf/releases/latest/download/lim-waf-linux-amd64" -o "$BIN_DIR/lim-waf"
 # For now, we assume the binary is built locally or will be available.
 if [ -f "./build/lim-waf" ]; then
-    cp ./build/lim-waf "$BIN_DIR/lim-waf"
+    if systemctl is-active --quiet lim-waf 2>/dev/null; then
+        echo "  Stopping running lim-waf service before update..."
+        systemctl stop lim-waf
+    fi
+    cp -f ./build/lim-waf "$BIN_DIR/lim-waf"
     chmod +x "$BIN_DIR/lim-waf"
     echo "  Local binary installed."
 else

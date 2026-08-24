@@ -94,17 +94,26 @@ sudo mkdir -p /opt/lim-waf-installer/build
 sudo chown -R $USER:$USER /opt/lim-waf-installer
 
 # On your local machine, SCP the build binary and scripts folder:
+# Default Port 22:
 scp build/lim-waf root@YOUR_VPS_IP:/opt/lim-waf-installer/build/lim-waf
 scp -r scripts root@YOUR_VPS_IP:/opt/lim-waf-installer/
+
+# If using Custom SSH Port (e.g., Port 2222 - Note capital -P):
+scp -P 2222 build/lim-waf root@YOUR_VPS_IP:/opt/lim-waf-installer/build/lim-waf
+scp -P 2222 -r scripts root@YOUR_VPS_IP:/opt/lim-waf-installer/
 ```
 
 ---
 
 ### Step 3: Run the Automated Installer
-SSH into your VPS and run the installer script:
+SSH into your VPS and run the installer script (use `-p <port>` if custom SSH port):
 
 ```bash
+# Default Port 22:
 ssh root@YOUR_VPS_IP
+
+# Custom Port (e.g., Port 2222 - Note lowercase -p):
+ssh -p 2222 root@YOUR_VPS_IP
 cd /opt/lim-waf-installer
 chmod +x scripts/install.sh
 sudo ./scripts/install.sh
@@ -228,32 +237,68 @@ sudo journalctl -u lim-waf -f
 The Admin Dashboard runs securely on port `9443`. Access it via SSH Tunneling:
 
 ```bash
-# Forward port 9443 from your local machine to VPS
+# Default Port 22:
 ssh -L 9443:127.0.0.1:9443 root@YOUR_VPS_IP
+
+# Custom SSH Port (e.g., Port 2222):
+ssh -p 2222 -L 9443:127.0.0.1:9443 root@YOUR_VPS_IP
 ```
 
 Open `http://127.0.0.1:9443` in your web browser and log in with your dashboard credentials.
 
 ---
 
-## Updating LIM WAF
+## Updating & Verifying LIM WAF
 
-To update an existing installation to a newer version:
+### Checking Existing Installation on VPS
+If LIM WAF is already installed on your server, you can verify its status and paths using these commands:
+
+```bash
+# 1. Verify binary location and version
+which lim-waf           # Should return /usr/local/bin/lim-waf
+lim-waf version         # Displays installed version
+
+# 2. Check systemd service status
+sudo systemctl status lim-waf
+
+# 3. Inspect configuration file & rule directory
+ls -la /etc/lim-waf/
+cat /etc/lim-waf/config.yaml
+
+# 4. Check active listening ports
+sudo ss -tulpn | grep lim-waf
+
+# 5. Check live application logs
+tail -f /var/log/lim-waf/service.log
+```
+
+---
+
+### Updating LIM WAF to a New Version
+If LIM WAF is already installed and running, you **do not** need to re-run the `/opt` installer. Simply build locally and replace the binary:
 
 1. **Build locally**:
    ```bash
    GOOS=linux GOARCH=amd64 go build -o build/lim-waf ./cmd/lim-waf
    ```
-2. **Upload binary to VPS**:
+2. **Upload binary directly to installation path**:
    ```bash
-   scp build/lim-waf root@YOUR_VPS_IP:/usr/local/bin/lim-waf
+   # Default Port 22:
+   scp build/lim-waf nuralim@YOUR_VPS_IP:~/lim-waf-new
+
+   # Custom SSH Port (e.g., Port 2222 - Note capital -P):
+   scp -P 2222 build/lim-waf nuralim@YOUR_VPS_IP:~/lim-waf-new
    ```
-3. **Restart Service**:
+3. **Move & Restart Service**:
    ```bash
-   ssh root@YOUR_VPS_IP "systemctl restart lim-waf && systemctl status lim-waf"
+   # Default Port 22:
+   ssh nuralim@YOUR_VPS_IP "sudo mv ~/lim-waf-new /usr/local/bin/lim-waf && sudo chmod +x /usr/local/bin/lim-waf && sudo systemctl restart lim-waf"
+
+   # Custom SSH Port (e.g., Port 2222 - Note lowercase -p):
+   ssh -p 2222 nuralim@YOUR_VPS_IP "sudo mv ~/lim-waf-new /usr/local/bin/lim-waf && sudo chmod +x /usr/local/bin/lim-waf && sudo systemctl restart lim-waf"
    ```
 
-*(Your `/etc/lim-waf/config.yaml` and custom rules remain preserved).*
+*(Your existing configurations in `/etc/lim-waf/config.yaml` and rules in `/etc/lim-waf/rules/` remain preserved).*
 
 ---
 
