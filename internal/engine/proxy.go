@@ -89,6 +89,8 @@ func NewReverseProxy(eng *WAFEngine) (*ReverseProxy, error) {
 					req.Header.Set("X-Forwarded-Proto", "http")
 				}
 			}
+			// Strip internal trust signal — must never reach the backend application.
+			req.Header.Del("X-LIM-Verified-Bot")
 		}
 
 		proxy.Transport = &http.Transport{

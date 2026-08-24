@@ -47,7 +47,7 @@ func (bd *BotDetection) Middleware(next http.Handler) http.Handler {
 			for _, allowedBot := range bd.config.AllowedBots {
 				if strings.Contains(uaLower, strings.ToLower(allowedBot)) {
 					// Found matching whitelisted bot UA pattern
-					if bd.config.VerifyBotsByDNS {
+					if bd.config.VerifyBotsByDNS != nil && *bd.config.VerifyBotsByDNS {
 						clientIP := getClientIP(r)
 						if !verifySearchBotDNS(clientIP, allowedBot) {
 							// User-Agent spoofing attempt detected!
@@ -56,18 +56,18 @@ func (bd *BotDetection) Middleware(next http.Handler) http.Handler {
 							return
 						}
 					}
-					// Legitimate/verified search engine crawler — pass through without header heuristic checks
+					// Legitimate/verified search engine crawler — signal downstream middleware
+					// and pass through without header heuristic checks.
+					// This header is an internal trust signal; it is stripped before reaching the backend.
+					r.Header.Set("X-LIM-Verified-Bot", getBotVendor(strings.ToLower(allowedBot)))
 					next.ServeHTTP(w, r)
 					return
 				}
 			}
 		}
 
-		// 3. Header Heuristics for General Browsers
+		// 3. Header Heuristics for Browser Spoofing Protection
 		if r.Method == http.MethodGet {
-			accept := r.Header.Get("Accept")
-			acceptLang := r.Header.Get("Accept-Language")
-
 			// Empty UA is suspicious for web traffic
 			if ua == "" {
 				atomic.AddUint64(&bd.stats.BotDetectedReqs, 1)
@@ -75,11 +75,14 @@ func (bd *BotDetection) Middleware(next http.Handler) http.Handler {
 				return
 			}
 
-			// Simple heuristic: If UA claims to be a standard browser (Mozilla...) but lacks basic headers
-			if strings.Contains(uaLower, "mozilla") {
-				if accept == "" || acceptLang == "" {
+			// Smart Browser-Spoofing Protection:
+			// Detect automated scrapers that claim to be a standard browser (Mozilla...) but fail to send standard Accept headers.
+			// Known crawlers, inspection tools, and SDKs are exempted to prevent false positives.
+			if strings.Contains(uaLower, "mozilla") && !isKnownToolOrBot(uaLower) {
+				accept := r.Header.Get("Accept")
+				if accept == "" {
 					atomic.AddUint64(&bd.stats.BotDetectedReqs, 1)
-					http.Error(w, "Forbidden - Suspicious Request Headers", http.StatusForbidden)
+					http.Error(w, "Forbidden - Suspicious Browser Request Headers", http.StatusForbidden)
 					return
 				}
 			}
@@ -88,6 +91,52 @@ func (bd *BotDetection) Middleware(next http.Handler) http.Handler {
 		// Proceed to next middleware
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isKnownToolOrBot checks if User-Agent contains keywords of official tools, crawlers, or SDKs.
+// This prevents the browser-spoofing heuristic from incorrectly flagging legitimate Google tools
+// (e.g., Google-InspectionTool, Google-Site-Verification) that send Mozilla-prefixed UAs.
+func isKnownToolOrBot(ua string) bool {
+	botKeywords := []string{
+		// Generic crawler signals
+		"bot", "crawler", "spider",
+		// Google common crawlers
+		"googlebot", "google-inspectiontool", "google-site-verification",
+		"storebot-google", "google-read-aloud", "google-safety", "google-extended",
+		"adsbot-google", "apis-google", "feedfetcher-google", "mediapartners-google",
+		// Google diagnostic tools
+		"inspection", "lighthouse", "pagespeed",
+		// Bing / Microsoft
+		"bingbot", "bing",
+		// Other search engines
+		"yandex", "baidu", "duckduck", "slurp",
+		// Social media preview fetchers
+		"facebook", "twitter", "whatsapp", "linkedin", "telegram", "discord",
+	}
+	for _, kw := range botKeywords {
+		if strings.Contains(ua, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// getBotVendor maps a known bot keyword to a canonical vendor name for the X-LIM-Verified-Bot header.
+func getBotVendor(keyword string) string {
+	switch {
+	case strings.Contains(keyword, "google"):
+		return "google"
+	case strings.Contains(keyword, "bing"):
+		return "bing"
+	case strings.Contains(keyword, "yandex"):
+		return "yandex"
+	case strings.Contains(keyword, "baidu"):
+		return "baidu"
+	case strings.Contains(keyword, "duckduck"):
+		return "duckduckgo"
+	default:
+		return "other"
+	}
 }
 
 // verifySearchBotDNS performs Forward-Confirmed Reverse DNS (FCrDNS) lookup

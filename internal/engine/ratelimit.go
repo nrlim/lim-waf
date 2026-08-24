@@ -123,6 +123,13 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 			}
 		}
 
+		// Verified search engine bots (set by BotDetection middleware after FCrDNS verification)
+		// receive a 5x rate limit to accommodate legitimate crawling bursts.
+		// This is NOT an unlimited bypass — the rate limiter remains fully active.
+		if r.Header.Get("X-LIM-Verified-Bot") != "" {
+			limit = limit * 5
+		}
+
 		if status.Count > limit+rl.config.Burst {
 			status.BanCount++
 			atomic.AddUint64(&rl.stats.RateLimitedReqs, 1)

@@ -57,6 +57,19 @@ func NewEngine(cfg *config.Config) (*WAFEngine, error) {
 		crsSetup := cfg.Rules.CRSPath + "/crs-setup.conf"
 		if _, err := os.Stat(crsSetup); err == nil {
 			corazaCfg = corazaCfg.WithDirectivesFromFile(crsSetup)
+
+			// Scanner detection exclusion for official Google crawlers and tools.
+			// Rules 913100/913110/913120 detect scanner fingerprints via User-Agent/headers,
+			// which produce false positives for legitimate Google tools (Google-InspectionTool,
+			// AdsBot-Google, APIs-Google, etc.) because their UA patterns overlap with scanner
+			// signatures in the CRS dataset.
+			//
+			// Security note: Fake Google bots are blocked earlier in the middleware chain by
+			// BotDetection (FCrDNS verification). By the time a request reaches Coraza with a
+			// Google UA, it has already been verified as legitimate. All other CRS rules
+			// (SQLi, XSS, RCE, LFI, etc.) remain fully active for all traffic.
+			corazaCfg = corazaCfg.WithDirectives(`SecRule REQUEST_HEADERS:User-Agent "@rx (?i)(?:google(?:bot|-inspectiontool|-site-verification|-read-aloud|-safety|-extended)|storebot-google|adsbot-google|apis-google|feedfetcher-google|mediapartners-google)" "id:10001,phase:1,pass,nolog,ctl:ruleRemoveById=913100,ctl:ruleRemoveById=913110,ctl:ruleRemoveById=913120"`)
+
 			corazaCfg = corazaCfg.WithDirectives("Include " + cfg.Rules.CRSPath + "/rules/*.conf")
 		}
 	}

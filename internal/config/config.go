@@ -96,10 +96,11 @@ type BotDetectionConfig struct {
 	Enabled         bool     `yaml:"enabled" json:"enabled"`
 	HoneypotPaths   []string `yaml:"honeypot_paths" json:"honeypot_paths"`
 	AllowedBots     []string `yaml:"allowed_bots" json:"allowed_bots"`
-	// VerifyBotsByDNS (default: false). When true, performs forward-confirmed reverse DNS (FCrDNS)
-	// lookups to ensure the bot IP truly originates from Google/Bing, preventing User-Agent spoofing.
-	// Defaults to false for maximum speed to prevent per-request DNS network latency.
-	VerifyBotsByDNS bool     `yaml:"verify_bots_by_dns" json:"verify_bots_by_dns"`
+	// VerifyBotsByDNS (default: true). When true, performs forward-confirmed reverse DNS (FCrDNS)
+	// lookups to ensure the bot IP truly originates from the claimed search engine, preventing UA spoofing.
+	// DNS lookups only happen for requests that match an AllowedBot UA pattern — never for all traffic.
+	// Set to false in config to disable DNS verification if latency is a concern.
+	VerifyBotsByDNS *bool    `yaml:"verify_bots_by_dns" json:"verify_bots_by_dns"`
 }
 
 // RequestValidationConfig configures payload validation.
@@ -201,8 +202,25 @@ func LoadConfig(path string) (*Config, error) {
 	// Apply Bot Detection Defaults
 	if len(cfg.BotDetection.AllowedBots) == 0 {
 		cfg.BotDetection.AllowedBots = []string{
-			"googlebot", "bingbot", "slurp", "duckduckbot", "baiduspider", "yandexbot",
+			// Google common crawlers
+			"googlebot", "google",
+			// Google user-triggered fetchers (GSC URL Inspection, Rich Results Test, etc.)
+			"google-inspectiontool", "google-site-verification", "storebot-google",
+			"google-read-aloud", "google-safety", "google-extended",
+			// Google special-case crawlers
+			"adsbot-google", "apis-google", "feedfetcher-google", "mediapartners-google",
+			// Other search engines
+			"bingbot", "bing", "slurp", "duckduckbot", "baiduspider", "yandexbot", "yandex",
+			// Social media preview fetchers
+			"facebookexternalhit", "twitterbot", "whatsapp", "linkedinbot",
 		}
+	}
+	// Default verify_bots_by_dns to true for maximum security against UA spoofing.
+	// DNS lookup only occurs for requests that match an AllowedBot UA — not all traffic.
+	// Operators can explicitly set verify_bots_by_dns: false in config to disable.
+	if cfg.BotDetection.VerifyBotsByDNS == nil {
+		v := true
+		cfg.BotDetection.VerifyBotsByDNS = &v
 	}
 
 	// Apply Request Validation Defaults
