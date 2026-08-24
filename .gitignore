@@ -5,6 +5,8 @@
 *.so
 *.dylib
 build/
+lim-waf-linux
+lim-waf-*
 
 # Test binary, built with `go test -c`
 *.test

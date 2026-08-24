@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -45,7 +46,7 @@ func parseCIDRList(ips []string) []*net.IPNet {
 	for _, ipStr := range ips {
 		// If it's just an IP without CIDR notation, add /32 or /128
 		if net.ParseIP(ipStr) != nil {
-			if stringsContainsColon(ipStr) {
+			if strings.Contains(ipStr, ":") {
 				ipStr += "/128"
 			} else {
 				ipStr += "/32"
@@ -60,15 +61,6 @@ func parseCIDRList(ips []string) []*net.IPNet {
 		}
 	}
 	return nets
-}
-
-func stringsContainsColon(s string) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] == ':' {
-			return true
-		}
-	}
-	return false
 }
 
 // IsWhitelisted checks if an IP is explicitly allowed.

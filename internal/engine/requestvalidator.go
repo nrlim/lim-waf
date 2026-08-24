@@ -24,7 +24,8 @@ func NewRequestValidator(cfg *config.RequestValidationConfig, stats *WAFStats) *
 	}
 }
 
-func parseSize(s string, defaultVal int64) int64 {
+// ParseSize converts string size representations (e.g. "10MB", "512KB", "1GB") to bytes.
+func ParseSize(s string, defaultVal int64) int64 {
 	s = strings.ToUpper(strings.TrimSpace(s))
 	multiplier := int64(1)
 	if strings.HasSuffix(s, "KB") {
@@ -37,25 +38,12 @@ func parseSize(s string, defaultVal int64) int64 {
 		multiplier = 1024 * 1024 * 1024
 		s = strings.TrimSuffix(s, "GB")
 	}
-	
+
 	val, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return defaultVal
 	}
 	return val * multiplier
-}
-
-func isBlockedExtension(path string, blocked []string) bool {
-	ext := strings.ToLower(filepath.Ext(path))
-	if ext == "" {
-		return false
-	}
-	for _, b := range blocked {
-		if ext == strings.ToLower(b) {
-			return true
-		}
-	}
-	return false
 }
 
 // Middleware enforces size limits and content rules.
@@ -64,7 +52,7 @@ func (rv *RequestValidator) Middleware(next http.Handler) http.Handler {
 		return next
 	}
 
-	maxBodyBytes := parseSize(rv.config.MaxBodySize, 10*1024*1024)
+	maxBodyBytes := ParseSize(rv.config.MaxBodySize, 10*1024*1024)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 1. Max URL Length
@@ -75,12 +63,10 @@ func (rv *RequestValidator) Middleware(next http.Handler) http.Handler {
 		}
 
 		// 2. Max Body Size (if Content-Length is provided)
-		if r.ContentLength > 0 {
-			if r.ContentLength > maxBodyBytes {
-				atomic.AddUint64(&rv.stats.ValidationFailReqs, 1)
-				http.Error(w, "Payload Too Large", http.StatusRequestEntityTooLarge)
-				return
-			}
+		if r.ContentLength > 0 && r.ContentLength > maxBodyBytes {
+			atomic.AddUint64(&rv.stats.ValidationFailReqs, 1)
+			http.Error(w, "Payload Too Large", http.StatusRequestEntityTooLarge)
+			return
 		}
 
 		// 3. Blocked Extensions
@@ -109,11 +95,11 @@ func (rv *RequestValidator) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// 4. Content Type Check (only if method expects body)
+		// 5. Content Type Check & MaxBytesReader (only if method expects body)
 		if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch {
 			cType := r.Header.Get("Content-Type")
 			allowedType := false
-			
+
 			// If AllowedContentTypes is empty, allow all. Otherwise, enforce.
 			if len(rv.config.AllowedContentTypes) == 0 {
 				allowedType = true
@@ -131,23 +117,12 @@ func (rv *RequestValidator) Middleware(next http.Handler) http.Handler {
 				http.Error(w, "Unsupported Media Type", http.StatusUnsupportedMediaType)
 				return
 			}
-			
-			// 5. Enforce max body size early via Content-Length if present
-			if r.ContentLength > maxBodyBytes {
-				atomic.AddUint64(&rv.stats.ValidationFailReqs, 1)
-				http.Error(w, "Payload Too Large", http.StatusRequestEntityTooLarge)
-				return
-			}
-			
+
 			// Wrap body with MaxBytesReader to prevent streaming abuse
 			if maxBodyBytes > 0 {
 				r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 			}
 		}
-
-		// TODO: Deep JSON parsing validation could be added here if needed, 
-		// but requires reading and buffering body which WAF does anyway.
-		// For now we rely on MaxBodyBytes to prevent huge JSON bombs.
 
 		next.ServeHTTP(w, r)
 	})

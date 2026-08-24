@@ -86,29 +86,33 @@ type RateLimitConfig struct {
 
 // IPReputationConfig configures IP blocking and reputation.
 type IPReputationConfig struct {
-	Enabled        bool     `yaml:"enabled" json:"enabled"`
-	Whitelist      []string `yaml:"whitelist" json:"whitelist"`
-	Blacklist      []string `yaml:"blacklist" json:"blacklist"`
-	BlockTor       bool     `yaml:"block_tor" json:"block_tor"`
-	AutoBanEnabled bool     `yaml:"auto_ban_enabled" json:"auto_ban_enabled"`
+	Enabled   bool     `yaml:"enabled" json:"enabled"`
+	Whitelist []string `yaml:"whitelist" json:"whitelist"`
+	Blacklist []string `yaml:"blacklist" json:"blacklist"`
 }
 
-// BotDetectionConfig configures advanced bot detection.
+// BotDetectionConfig configures bot detection and search engine bot whitelisting.
 type BotDetectionConfig struct {
 	Enabled         bool     `yaml:"enabled" json:"enabled"`
 	HoneypotPaths   []string `yaml:"honeypot_paths" json:"honeypot_paths"`
-	VerifyGoodBots  bool     `yaml:"verify_good_bots" json:"verify_good_bots"`
+	AllowedBots     []string `yaml:"allowed_bots" json:"allowed_bots"`
+	// VerifyBotsByDNS (default: false). When true, performs forward-confirmed reverse DNS (FCrDNS)
+	// lookups to ensure the bot IP truly originates from Google/Bing, preventing User-Agent spoofing.
+	// Defaults to false for maximum speed to prevent per-request DNS network latency.
+	VerifyBotsByDNS bool     `yaml:"verify_bots_by_dns" json:"verify_bots_by_dns"`
 }
 
 // RequestValidationConfig configures payload validation.
 type RequestValidationConfig struct {
 	Enabled             bool     `yaml:"enabled" json:"enabled"`
 	MaxBodySize         string   `yaml:"max_body_size" json:"max_body_size"`
+	ResponseBodyLimit   string   `yaml:"response_body_limit" json:"response_body_limit"`
 	MaxURLLength        int      `yaml:"max_url_length" json:"max_url_length"`
 	MaxHeaderSize       int      `yaml:"max_header_size" json:"max_header_size"`
 	MaxJSONDepth        int      `yaml:"max_json_depth" json:"max_json_depth"`
 	AllowedContentTypes []string `yaml:"allowed_content_types" json:"allowed_content_types"`
 	BlockedExtensions   []string `yaml:"blocked_extensions" json:"blocked_extensions"`
+	ResponseBodyMimeTypes []string `yaml:"response_body_mime_types" json:"response_body_mime_types"`
 }
 
 // CORSConfig configures Cross-Origin Resource Sharing.
@@ -194,9 +198,24 @@ func LoadConfig(path string) (*Config, error) {
 		cfg.RateLimit.BanDuration = "10m"
 	}
 
+	// Apply Bot Detection Defaults
+	if len(cfg.BotDetection.AllowedBots) == 0 {
+		cfg.BotDetection.AllowedBots = []string{
+			"googlebot", "bingbot", "slurp", "duckduckbot", "baiduspider", "yandexbot",
+		}
+	}
+
 	// Apply Request Validation Defaults
 	if cfg.RequestValidation.MaxBodySize == "" {
 		cfg.RequestValidation.MaxBodySize = "10MB"
+	}
+	if cfg.RequestValidation.ResponseBodyLimit == "" {
+		cfg.RequestValidation.ResponseBodyLimit = "512KB"
+	}
+	if len(cfg.RequestValidation.ResponseBodyMimeTypes) == 0 {
+		cfg.RequestValidation.ResponseBodyMimeTypes = []string{
+			"text/html", "text/plain", "application/json", "application/xml",
+		}
 	}
 	if cfg.RequestValidation.MaxURLLength == 0 {
 		cfg.RequestValidation.MaxURLLength = 8192

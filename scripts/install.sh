@@ -75,6 +75,18 @@ logging:
 branding:
   name: "LIM"
   url: "https://nuralim.dev"
+
+bot_detection:
+  enabled: true
+  honeypot_paths:
+    - /wp-login.php
+    - /.env
+  allowed_bots:
+    - googlebot
+    - bingbot
+    - slurp
+    - duckduckbot
+  verify_bots_by_dns: false
 EOF
     echo "  Default config.yaml created."
 else

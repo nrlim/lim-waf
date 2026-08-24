@@ -17,6 +17,7 @@ type ThreatLogEntry struct {
 	Method       string `json:"method"`
 	URI          string `json:"uri"`
 	ResponseCode int    `json:"response_code"`
+	DurationMs   int64  `json:"duration_ms"`
 	Blocked      bool   `json:"blocked"`
 	UserAgent    string `json:"user_agent"`
 }
@@ -72,7 +73,7 @@ func (tl *ThreatLogger) Middleware(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rw := &responseWriterWrapper{ResponseWriter: w, statusCode: 0}
-		
+
 		start := time.Now()
 		next.ServeHTTP(rw, r)
 		duration := time.Since(start)
@@ -87,22 +88,15 @@ func (tl *ThreatLogger) Middleware(next http.Handler) http.Handler {
 			Method:       r.Method,
 			URI:          r.URL.RequestURI(),
 			ResponseCode: rw.statusCode,
+			DurationMs:   duration.Milliseconds(),
 			Blocked:      rw.statusCode == http.StatusForbidden || rw.statusCode == http.StatusNotAcceptable || rw.statusCode == http.StatusTooManyRequests,
 			UserAgent:    r.Header.Get("User-Agent"),
 		}
 
-		// Calculate threat score based on basic heuristics or Coraza's blocking.
-		// For now, if it was blocked, consider it a high threat.
-		// In a real scenario, this would aggregate scores from all modules.
-
 		b, err := json.Marshal(entry)
 		if err == nil {
-			// Write the JSON line
 			tl.logger.Println(string(b))
 		}
-		
-		// Let the compiler know duration might be used later if we add it to log
-		_ = duration
 	})
 }
 

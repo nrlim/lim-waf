@@ -119,9 +119,9 @@ func NewReverseProxy(eng *WAFEngine) (*ReverseProxy, error) {
 		if handler, ok := proxies[host]; ok {
 			handler.ServeHTTP(w, r)
 		} else {
-			// Fallback to the first site if host doesn't match
-			firstSiteDomain := strings.ToLower(eng.Config.Sites[0].Domain)
-			proxies[firstSiteDomain].ServeHTTP(w, r)
+			// Strict Host Validation: Block direct IP access or unknown domains
+			atomic.AddUint64(&eng.Stats.BlockedRequests, 1)
+			BlockErrorHandler(eng.Config)(w, r, fmt.Errorf("Unknown Host: %s", host))
 		}
 	})
 

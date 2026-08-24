@@ -35,11 +35,21 @@ type WAFEngine struct {
 
 // NewEngine initializes Coraza WAF based on the provided configuration.
 func NewEngine(cfg *config.Config) (*WAFEngine, error) {
-	// Initialize Coraza Config
+	reqBodyLimit := int(ParseSize(cfg.RequestValidation.MaxBodySize, 10*1024*1024))
+	respBodyLimit := int(ParseSize(cfg.RequestValidation.ResponseBodyLimit, 512*1024))
+
+	// Initialize Coraza Config with Go API performance tunings
 	corazaCfg := coraza.NewWAFConfig().
 		WithDirectives("SecRuleEngine " + getSecRuleEngineStatus(cfg.Sites[0].WAF.Mode)).
 		WithDirectives("SecRequestBodyAccess On").
-		WithDirectives("SecResponseBodyAccess On")
+		WithDirectives("SecResponseBodyAccess On").
+		WithRequestBodyLimit(reqBodyLimit).
+		WithResponseBodyLimit(respBodyLimit).
+		WithResponseBodyMimeTypes(cfg.RequestValidation.ResponseBodyMimeTypes).
+		WithDirectives(fmt.Sprintf("SecRequestBodyLimit %d", reqBodyLimit)).
+		WithDirectives(fmt.Sprintf("SecResponseBodyLimit %d", respBodyLimit)).
+		WithDirectives("SecAuditEngine RelevantOnly").
+		WithDirectives(`SecAuditLogRelevantStatus "^(?:5|4(?!04))"`)
 
 	// Load CRS rules if path is provided
 	if cfg.Rules.CRSPath != "" {
@@ -51,9 +61,6 @@ func NewEngine(cfg *config.Config) (*WAFEngine, error) {
 	if cfg.Rules.CustomRulesPath != "" {
 		corazaCfg = corazaCfg.WithDirectives("Include " + cfg.Rules.CustomRulesPath + "/*.conf")
 	}
-
-	// Disable internal error page to let proxy handle the disruption via WrapHandler
-	// corazaCfg = corazaCfg.WithErrorCallback(CorazaErrorHandler(cfg))
 
 	waf, err := coraza.NewWAF(corazaCfg)
 	if err != nil {
