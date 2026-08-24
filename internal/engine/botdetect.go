@@ -124,7 +124,7 @@ func isKnownToolOrBot(ua string) bool {
 // getBotVendor maps a known bot keyword to a canonical vendor name for the X-LIM-Verified-Bot header.
 func getBotVendor(keyword string) string {
 	switch {
-	case strings.Contains(keyword, "google"):
+	case strings.Contains(keyword, "google"), strings.Contains(keyword, "lighthouse"), strings.Contains(keyword, "pagespeed"):
 		return "google"
 	case strings.Contains(keyword, "bing"):
 		return "bing"

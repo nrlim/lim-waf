@@ -68,7 +68,7 @@ func NewEngine(cfg *config.Config) (*WAFEngine, error) {
 			// BotDetection (FCrDNS verification). By the time a request reaches Coraza with a
 			// Google UA, it has already been verified as legitimate. All other CRS rules
 			// (SQLi, XSS, RCE, LFI, etc.) remain fully active for all traffic.
-			corazaCfg = corazaCfg.WithDirectives(`SecRule REQUEST_HEADERS:User-Agent "@rx (?i)(?:google(?:bot|-inspectiontool|-site-verification|-read-aloud|-safety|-extended)|storebot-google|adsbot-google|apis-google|feedfetcher-google|mediapartners-google)" "id:10001,phase:1,pass,nolog,ctl:ruleRemoveById=913100,ctl:ruleRemoveById=913110,ctl:ruleRemoveById=913120"`)
+			corazaCfg = corazaCfg.WithDirectives(`SecRule REQUEST_HEADERS:User-Agent "@rx (?i)(?:google(?:bot|-inspectiontool|-site-verification|-read-aloud|-safety|-extended)|storebot-google|adsbot-google|apis-google|feedfetcher-google|mediapartners-google|lighthouse|pagespeed)" "id:10001,phase:1,pass,nolog,ctl:ruleRemoveById=913100,ctl:ruleRemoveById=913110,ctl:ruleRemoveById=913120"`)
 
 			corazaCfg = corazaCfg.WithDirectives("Include " + cfg.Rules.CRSPath + "/rules/*.conf")
 		}

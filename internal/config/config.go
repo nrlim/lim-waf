@@ -204,9 +204,9 @@ func LoadConfig(path string) (*Config, error) {
 		cfg.BotDetection.AllowedBots = []string{
 			// Google common crawlers
 			"googlebot", "google",
-			// Google user-triggered fetchers (GSC URL Inspection, Rich Results Test, etc.)
+			// Google user-triggered fetchers (GSC URL Inspection, PageSpeed Insights, Rich Results Test, etc.)
 			"google-inspectiontool", "google-site-verification", "storebot-google",
-			"google-read-aloud", "google-safety", "google-extended",
+			"google-read-aloud", "google-safety", "google-extended", "lighthouse", "pagespeed",
 			// Google special-case crawlers
 			"adsbot-google", "apis-google", "feedfetcher-google", "mediapartners-google",
 			// Other search engines

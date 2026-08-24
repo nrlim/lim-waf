@@ -95,9 +95,11 @@ func NewReverseProxy(eng *WAFEngine) (*ReverseProxy, error) {
 
 		proxy.Transport = &http.Transport{
 			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   100,
 			IdleConnTimeout:       90 * time.Second,
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
+			ForceAttemptHTTP2:     true,
 		}
 
 		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
