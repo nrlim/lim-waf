@@ -3,6 +3,7 @@ package engine
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/corazawaf/coraza/v3"
@@ -42,24 +43,29 @@ func NewEngine(cfg *config.Config) (*WAFEngine, error) {
 	corazaCfg := coraza.NewWAFConfig().
 		WithDirectives("SecRuleEngine " + getSecRuleEngineStatus(cfg.Sites[0].WAF.Mode)).
 		WithDirectives("SecRequestBodyAccess On").
-		WithDirectives("SecResponseBodyAccess On").
+		WithDirectives("SecResponseBodyAccess Off").
 		WithRequestBodyLimit(reqBodyLimit).
 		WithResponseBodyLimit(respBodyLimit).
 		WithResponseBodyMimeTypes(cfg.RequestValidation.ResponseBodyMimeTypes).
 		WithDirectives(fmt.Sprintf("SecRequestBodyLimit %d", reqBodyLimit)).
 		WithDirectives(fmt.Sprintf("SecResponseBodyLimit %d", respBodyLimit)).
 		WithDirectives("SecAuditEngine RelevantOnly").
-		WithDirectives(`SecAuditLogRelevantStatus "^(?:5|4(?!04))"`)
+		WithDirectives(`SecAuditLogRelevantStatus "^(?:5\d\d|40[0-3]|40[5-9]|4[1-9]\d)"`)
 
-	// Load CRS rules if path is provided
+	// Load CRS rules if path is provided and setup file exists
 	if cfg.Rules.CRSPath != "" {
-		corazaCfg = corazaCfg.WithDirectivesFromFile(cfg.Rules.CRSPath + "/crs-setup.conf")
-		corazaCfg = corazaCfg.WithDirectives("Include " + cfg.Rules.CRSPath + "/rules/*.conf")
+		crsSetup := cfg.Rules.CRSPath + "/crs-setup.conf"
+		if _, err := os.Stat(crsSetup); err == nil {
+			corazaCfg = corazaCfg.WithDirectivesFromFile(crsSetup)
+			corazaCfg = corazaCfg.WithDirectives("Include " + cfg.Rules.CRSPath + "/rules/*.conf")
+		}
 	}
 
-	// Load Custom rules if path is provided
+	// Load Custom rules if path is provided and directory exists
 	if cfg.Rules.CustomRulesPath != "" {
-		corazaCfg = corazaCfg.WithDirectives("Include " + cfg.Rules.CustomRulesPath + "/*.conf")
+		if _, err := os.Stat(cfg.Rules.CustomRulesPath); err == nil {
+			corazaCfg = corazaCfg.WithDirectives("Include " + cfg.Rules.CustomRulesPath + "/*.conf")
+		}
 	}
 
 	waf, err := coraza.NewWAF(corazaCfg)

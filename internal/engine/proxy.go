@@ -67,6 +67,23 @@ func NewReverseProxy(eng *WAFEngine) (*ReverseProxy, error) {
 
 		proxy := httputil.NewSingleHostReverseProxy(targetURL)
 
+		originalDirector := proxy.Director
+		proxy.Director = func(req *http.Request) {
+			reqHost := req.Host
+			originalDirector(req)
+			if reqHost != "" {
+				req.Host = reqHost
+				req.Header.Set("X-Forwarded-Host", reqHost)
+			}
+			if req.Header.Get("X-Forwarded-Proto") == "" {
+				if req.TLS != nil {
+					req.Header.Set("X-Forwarded-Proto", "https")
+				} else {
+					req.Header.Set("X-Forwarded-Proto", "http")
+				}
+			}
+		}
+
 		proxy.Transport = &http.Transport{
 			MaxIdleConns:          100,
 			IdleConnTimeout:       90 * time.Second,

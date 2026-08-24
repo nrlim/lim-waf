@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/nrlim/lim-waf/internal/config"
@@ -51,6 +52,11 @@ type ThreatLogger struct {
 func NewThreatLogger(cfg *config.ThreatLoggingConfig) (*ThreatLogger, error) {
 	if !cfg.Enabled {
 		return &ThreatLogger{config: cfg}, nil
+	}
+
+	dir := filepath.Dir(cfg.Output)
+	if dir != "" && dir != "." {
+		_ = os.MkdirAll(dir, 0755)
 	}
 
 	f, err := os.OpenFile(cfg.Output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
