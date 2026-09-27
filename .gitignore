@@ -41,3 +41,12 @@ scripts/load-test.ps1
 proxies.txt
 waf_testing_guide.md
 testenv/config.yaml
+
+# Internal Stress Test Tool & Reports (do not commit)
+cmd/lim-stresstest/
+internal/stresstest/
+report.md
+*.md
+!README.md
+!AGENTS.md
+

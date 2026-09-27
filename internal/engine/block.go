@@ -61,6 +61,8 @@ func BlockErrorHandler(cfg *config.Config) func(http.ResponseWriter, *http.Reque
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// This self-contained error page needs inline CSS, not the site's CSP.
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'none'; base-uri 'none'; form-action 'none'")
 		w.WriteHeader(http.StatusForbidden)
 		w.Write(buf.Bytes())
 	}

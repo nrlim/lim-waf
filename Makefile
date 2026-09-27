@@ -6,7 +6,7 @@ BUILD_DIR = build
 GO_FILES = $(shell find . -name '*.go')
 
 # Build targets
-.PHONY: all build clean install release
+.PHONY: all build build-stresstest clean install release
 
 all: build
 
@@ -17,10 +17,16 @@ $(BUILD_DIR)/$(APP_NAME): $(GO_FILES)
 	@mkdir -p $(BUILD_DIR)
 	go build -o $@ -ldflags="-X main.Version=$(VERSION)" ./cmd/lim-waf
 
+build-stresstest: $(GO_FILES)
+	@echo "Building lim-stresstest..."
+	@mkdir -p $(BUILD_DIR)
+	go build -o $(BUILD_DIR)/lim-stresstest ./cmd/lim-stresstest
+
 clean:
 	@echo "Cleaning up..."
 	@rm -rf $(BUILD_DIR)
 	@go clean
+
 
 install: build
 	@echo "Installing to /usr/local/bin..."
