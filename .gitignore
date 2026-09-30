@@ -49,4 +49,5 @@ report.md
 *.md
 !README.md
 !AGENTS.md
+!docs/csp.md
 

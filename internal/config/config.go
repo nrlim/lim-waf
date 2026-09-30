@@ -41,6 +41,8 @@ type SiteConfig struct {
 	Domain  string    `yaml:"domain" json:"domain"`
 	Backend string    `yaml:"backend" json:"backend"`
 	WAF     WAFConfig `yaml:"waf" json:"waf"`
+	// CSP overrides the global policy for this site (including its www alias).
+	CSP string `yaml:"csp" json:"csp"`
 }
 
 // WAFConfig configures Coraza for a specific site.
@@ -93,26 +95,26 @@ type IPReputationConfig struct {
 
 // BotDetectionConfig configures bot detection and search engine bot whitelisting.
 type BotDetectionConfig struct {
-	Enabled         bool     `yaml:"enabled" json:"enabled"`
-	HoneypotPaths   []string `yaml:"honeypot_paths" json:"honeypot_paths"`
-	AllowedBots     []string `yaml:"allowed_bots" json:"allowed_bots"`
+	Enabled       bool     `yaml:"enabled" json:"enabled"`
+	HoneypotPaths []string `yaml:"honeypot_paths" json:"honeypot_paths"`
+	AllowedBots   []string `yaml:"allowed_bots" json:"allowed_bots"`
 	// VerifyBotsByDNS (default: true). When true, performs forward-confirmed reverse DNS (FCrDNS)
 	// lookups to ensure the bot IP truly originates from the claimed search engine, preventing UA spoofing.
 	// DNS lookups only happen for requests that match an AllowedBot UA pattern — never for all traffic.
 	// Set to false in config to disable DNS verification if latency is a concern.
-	VerifyBotsByDNS *bool    `yaml:"verify_bots_by_dns" json:"verify_bots_by_dns"`
+	VerifyBotsByDNS *bool `yaml:"verify_bots_by_dns" json:"verify_bots_by_dns"`
 }
 
 // RequestValidationConfig configures payload validation.
 type RequestValidationConfig struct {
-	Enabled             bool     `yaml:"enabled" json:"enabled"`
-	MaxBodySize         string   `yaml:"max_body_size" json:"max_body_size"`
-	ResponseBodyLimit   string   `yaml:"response_body_limit" json:"response_body_limit"`
-	MaxURLLength        int      `yaml:"max_url_length" json:"max_url_length"`
-	MaxHeaderSize       int      `yaml:"max_header_size" json:"max_header_size"`
-	MaxJSONDepth        int      `yaml:"max_json_depth" json:"max_json_depth"`
-	AllowedContentTypes []string `yaml:"allowed_content_types" json:"allowed_content_types"`
-	BlockedExtensions   []string `yaml:"blocked_extensions" json:"blocked_extensions"`
+	Enabled               bool     `yaml:"enabled" json:"enabled"`
+	MaxBodySize           string   `yaml:"max_body_size" json:"max_body_size"`
+	ResponseBodyLimit     string   `yaml:"response_body_limit" json:"response_body_limit"`
+	MaxURLLength          int      `yaml:"max_url_length" json:"max_url_length"`
+	MaxHeaderSize         int      `yaml:"max_header_size" json:"max_header_size"`
+	MaxJSONDepth          int      `yaml:"max_json_depth" json:"max_json_depth"`
+	AllowedContentTypes   []string `yaml:"allowed_content_types" json:"allowed_content_types"`
+	BlockedExtensions     []string `yaml:"blocked_extensions" json:"blocked_extensions"`
 	ResponseBodyMimeTypes []string `yaml:"response_body_mime_types" json:"response_body_mime_types"`
 }
 

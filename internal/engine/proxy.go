@@ -123,13 +123,20 @@ func NewReverseProxy(eng *WAFEngine) (*ReverseProxy, error) {
 		}
 
 		// Apply middlewares (Outermost to innermost)
-		// Chain: ThreatLogger -> RateLimiter -> IPReputation -> BotDetection -> RequestValidator -> SecurityHeaders -> WAF -> Proxy
-		finalHandler = eng.SecurityHeaders.Middleware(finalHandler)
+		// Chain: SecurityHeaders -> ThreatLogger -> RateLimiter -> IPReputation -> BotDetection -> RequestValidator -> WAF -> Proxy
 		finalHandler = eng.RequestValidator.Middleware(finalHandler)
 		finalHandler = eng.BotDetection.Middleware(finalHandler)
 		finalHandler = eng.IPReputation.Middleware(finalHandler)
 		finalHandler = eng.RateLimiter.Middleware(finalHandler)
 		finalHandler = eng.ThreatLogger.Middleware(finalHandler)
+		// The firewall owns CSP, including responses rejected before reaching the backend.
+		securityHeaders := eng.SecurityHeaders
+		if siteCfg.CSP != "" {
+			headers := eng.Config.SecurityHeaders
+			headers.CSP = siteCfg.CSP
+			securityHeaders = NewSecurityHeaders(&headers)
+		}
+		finalHandler = securityHeaders.Middleware(finalHandler)
 
 		domain := strings.ToLower(siteCfg.Domain)
 		proxies[domain] = finalHandler

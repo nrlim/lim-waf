@@ -27,23 +27,22 @@ func (sh *SecurityHeaders) Middleware(next http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Handle CORS Preflight
+		// Apply CSP at response commit so upstream headers cannot duplicate the policy.
+		sw := &secHeaderWriter{ResponseWriter: w, sh: sh, r: r, headerWritten: false}
 		if sh.config.CORS.Enabled && r.Method == http.MethodOptions {
-			if sh.handleCORS(w, r) {
-				w.WriteHeader(http.StatusNoContent)
+			if sh.handleCORS(sw, r) {
+				sw.WriteHeader(http.StatusNoContent)
 				return
 			}
 		}
-
-		// Use a wrapper that defers header writing until the upstream response is received,
-		// so we can check what the backend already set and avoid overwriting.
-		sw := &secHeaderWriter{ResponseWriter: w, sh: sh, r: r, headerWritten: false}
 		next.ServeHTTP(sw, r)
+		if !sw.headerWritten {
+			sw.WriteHeader(http.StatusOK)
+		}
 	})
 }
 
-// secHeaderWriter intercepts WriteHeader to inject security headers only if
-// the upstream backend (Next.js) hasn't already set them.
+// secHeaderWriter replaces upstream CSP and fills other missing security headers.
 type secHeaderWriter struct {
 	http.ResponseWriter
 	sh            *SecurityHeaders
@@ -52,10 +51,15 @@ type secHeaderWriter struct {
 }
 
 func (sw *secHeaderWriter) WriteHeader(statusCode int) {
-	if !sw.headerWritten {
-		sw.headerWritten = true
-		sw.applyHeaders()
+	if statusCode >= 100 && statusCode < 200 {
+		sw.ResponseWriter.WriteHeader(statusCode)
+		return
 	}
+	if sw.headerWritten {
+		return
+	}
+	sw.headerWritten = true
+	sw.applyHeaders()
 	sw.ResponseWriter.WriteHeader(statusCode)
 }
 
@@ -68,6 +72,9 @@ func (sw *secHeaderWriter) Write(b []byte) (int, error) {
 }
 
 func (sw *secHeaderWriter) Flush() {
+	if !sw.headerWritten {
+		sw.WriteHeader(http.StatusOK)
+	}
 	if flusher, ok := sw.ResponseWriter.(http.Flusher); ok {
 		flusher.Flush()
 	}
@@ -90,7 +97,19 @@ func (sw *secHeaderWriter) applyHeaders() {
 	}
 
 	if sw.sh.config.CSP != "" {
-		sw.setIfAbsent("Content-Security-Policy", sw.sh.config.CSP)
+		policy := sw.sh.config.CSP
+		// Preserve the application's stricter sandbox for private document responses.
+		for _, upstream := range sw.Header().Values("Content-Security-Policy") {
+			if upstream == "default-src 'none'; style-src 'unsafe-inline'; script-src 'none'; base-uri 'none'; form-action 'none'" {
+				policy = upstream // Firewall block pages have a stricter, self-contained policy.
+				break
+			}
+			if strings.TrimSpace(upstream) == "sandbox" {
+				policy += "; sandbox"
+				break
+			}
+		}
+		sw.Header().Set("Content-Security-Policy", policy)
 	}
 
 	if sw.sh.config.ReferrerPolicy != "" {
